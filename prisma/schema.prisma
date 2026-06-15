@@ -1,0 +1,114 @@
+// prisma/schema.prisma
+// DAY 2 — All 5 database tables
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Table 1: Users ────────────────────────────────────────────────────────────
+model User {
+  id               String   @id @default(cuid())
+  email            String?  @unique
+  name             String?
+  avatarUrl        String?
+  githubId         String   @unique
+  githubToken      String
+  plan             Plan     @default(FREE)
+  stripeCustomerId String?  // set when user first pays — needed for billing portal
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  repos            Repo[]
+
+  @@map("users")
+}
+
+// ── Table 2: Repos ────────────────────────────────────────────────────────────
+model Repo {
+  id           String   @id @default(cuid())
+  githubRepoId Int      @unique
+  name         String
+  fullName     String
+  description  String?
+  isPrivate    Boolean  @default(false)
+  slug         String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  releases     Release[]
+  subscribers  Subscriber[]
+
+  @@map("repos")
+}
+
+// ── Table 3: Releases ─────────────────────────────────────────────────────────
+model Release {
+  id          String        @id @default(cuid())
+  version     String
+  title       String
+  description String?
+  status      ReleaseStatus @default(DRAFT)
+  publishedAt DateTime?
+  repoId      String
+  repo        Repo          @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  entries     Entry[]
+
+  @@map("releases")
+}
+
+// ── Table 4: Entries ──────────────────────────────────────────────────────────
+model Entry {
+  id        String   @id @default(cuid())
+  prNumber  Int
+  prTitle   String
+  prUrl     String?
+  category  Category @default(IMPROVEMENT)
+  title     String
+  releaseId String
+  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("entries")
+}
+
+// ── Table 5: Subscribers ──────────────────────────────────────────────────────
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String
+  confirmed Boolean  @default(false)
+  repoId    String
+  repo      Repo     @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([email, repoId])
+  @@map("subscribers")
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+enum Plan {
+  FREE
+  PRO
+  TEAM
+}
+
+enum ReleaseStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum Category {
+  FEATURE
+  BUG_FIX
+  IMPROVEMENT
+}
